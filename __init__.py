@@ -1,74 +1,76 @@
 import time
-import asyncio
-from binaryninja.log import log_warn
+from binaryninja import Settings
+from binaryninja.log import log_debug, log_warn
 from binaryninja.plugin import BackgroundTaskThread, PluginCommand
 from binaryninjaui import UIContextNotification, UIContext, DockHandler
-from pathlib import Path
 import pypresence
 
+Settings().register_group("discordpresence", "Discord Presence")
+Settings().register_setting("discordpresence.hideFile", """
+    {
+        "title" : "Hide Filenames",
+        "type" : "boolean",
+        "default" : true,
+        "description" : "Whether to hide the specific filename in the discord presence notification",
+        "ignore" : ["SettingsProjectScope", "SettingsResourceScope"]
+    }
+""")
 
 class DiscordRichPresenceNotification(UIContextNotification):
-    name = "No file opened"
-    view_frame = None
-    rich_presence = None
+    name = "File reporting disabled"
 
-    def __init__(self, rich_presence):
+    def __init__(self):
         UIContextNotification.__init__(self)
         UIContext.registerNotification(self)
-        self.rich_presence = rich_presence
 
-    def OnAfterOpenFile(self, context, file, frame):
-        self.name = file.filename
-        log_warn(f"New name: {self.name}")
-        self.view_frame = frame
+    def __del__(self):
+        UIContext.unregisterNotification(self)
 
-    def OnViewChanged(self, context, frame, type):
-        if frame:
-            if frame != self.view_frame:
-                self.name = Path(self.view_frame.actionContext().binaryView.file.original_filename).name
-                log_warn(f"New name: {self.name}")
+    def OnViewChange(self, context, frame, type):
+        log_debug("Discord plugin: View changed")
+        if frame and not Settings().get_bool("discordpresence.hideFile"):
+            self.name = frame.getShortFileName()
+            log_debug(f"Discord plugin: New name changed: {self.name}")
+        if not frame:
+            self.name = "None"
 
+    def fileName(self):
+        return self.name
 
 class DiscordRichPresence(BackgroundTaskThread):
     client_id = "1194300014214787103"
-    filename = "No file opened"
+    filename = "None"
+    notif = None
 
-    def __init__(self):
+    def __init__(self, notification):
+        self.notification = notification
+        #self.filename = self.notification.fileName()
         try:
-            BackgroundTaskThread.__init__(self, initial_progress_text='Running Discord Rich Presence', can_cancel=True)
-            self.loop = asyncio.new_event_loop()
-            self.rpc = pypresence.Presence(client_id=DiscordRichPresence.client_id, loop=self.loop)
+            BackgroundTaskThread.__init__(self, initial_progress_text='Discord Presence', can_cancel=True)
+            self.rpc = pypresence.Presence(client_id=DiscordRichPresence.client_id)
             self.active = True
         except pypresence.exceptions.DiscordNotFound:
-            log_warn("Pypresence unable to load. Check dependencies or ensure discord is running.")
+            log_warn("Pypresence unable to load. Check dependencies or ensure Discord is running.")
 
     def run(self):
-        asyncio.set_event_loop(self.loop)
         self.rpc.connect()
-
-        dock_handler = DockHandler.getActiveDockHandler()
-
-        start = None
+        start = int(time.time())
+        self.rpc.update(large_image="bn-logo-round", large_text="Binary Ninja",
+                        small_text="Binary Ninja", start=start, details=f"File: {self.filename}")
         while self.active:
-            view_frame = dock_handler.getViewFrame()
-
-            if view_frame:
-                name = view_frame.getShortFileName()
-
-                if not start:
-                    start = int(time.time())
-
-                log_warn("Updating presence info")
+            # Discord only lets you set presence every 15s but I want to keep the sleep short to shut down faster
+            if self.filename != self.notification.fileName() and (int(time.time()) % 15 == 0):
+                self.filename = self.notification.fileName()
+                start = int(time.time())
                 self.rpc.update(large_image="bn-logo-round", large_text="Binary Ninja",
-                                small_text="Binary Ninja", start=start, details=f"{name}")
-
-            else:
-                start = None
-                self.rpc.clear()
-
-            time.sleep(15)
-
+                                small_text="Binary Ninja", start=start, details=f"File: {self.filename}")
+            time.sleep(1)
+        self.progress = ""
         self.rpc.close()
+
+    def runAction(self, _):
+        self.active = True
+        self.run()
 
     def isActive(self, _):
         return self.active
@@ -77,15 +79,15 @@ class DiscordRichPresence(BackgroundTaskThread):
         return not self.active
 
     def cancel(self):
-        return self.finish()
-
-    def finish(self):
         self.active = False
-        return True
 
+    def cancelAction(self, _):
+        self.cancel()
 
-task = DiscordRichPresence()
+notification = DiscordRichPresenceNotification()
+task = DiscordRichPresence(notification)
 task.start()
 
-PluginCommand.register("Start Discord Presence", "Start Discord Presence", task.start, task.isNotActive)
-PluginCommand.register("Stop Discord Presence", "Start Discord Presence", task.cancel, task.isActive)
+# Broken
+# PluginCommand.register("Start Discord Presence", "Start Discord Presence", task.runAction, task.isNotActive)
+PluginCommand.register("Stop Discord Presence", "Start Discord Presence", task.cancelAction, task.isActive)
