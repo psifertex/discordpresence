@@ -1,6 +1,6 @@
 {
   "pluginmetadataversion": 2,
-  "name": "Discord Rich Presence",
+  "name": "Discord Integration",
   "type": [
     "helper"
   ],

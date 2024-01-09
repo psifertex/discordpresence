@@ -11,6 +11,8 @@
 
 The plugin displays the file name of the binary in the current view as well as the elapsed time.
 
+Note that by default, file names will be hidden. To allow file name reporting, disable the `discordpresence.hideFile` setting.
+
 ## Requirements
 
 The plugin uses [`pypresence`](https://pypi.org/project/pypresence/) for the Discord integration. Should be automatically installed by the plugin manager.
