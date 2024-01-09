@@ -7,7 +7,7 @@
 
 ## Features
 
-<img src="https://i.imgur.com/sLZSS3u.png " width="100" />
+<img src="https://i.imgur.com/sLZSS3u.png " align="right" width="300" />
 
 The plugin displays the file name of the binary in the current view as well as the elapsed time.
 
