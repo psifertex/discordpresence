@@ -23,7 +23,7 @@ To install this plugin, please see the "Using Plugins" section of the [Getting S
 
 ## History
 
-Project was originally written by xiten, updated by LittleDyingDuck, then rewritten by psifertex
+Project was originally written by xiten, updated by Duck, then rewritten by psifertex
 
 ## License
 
