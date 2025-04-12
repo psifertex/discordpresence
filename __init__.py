@@ -2,7 +2,7 @@ import time
 from binaryninja import Settings
 from binaryninja.log import log_debug, log_warn
 from binaryninja.plugin import BackgroundTaskThread, PluginCommand
-from binaryninjaui import UIContextNotification, UIContext, DockHandler
+from binaryninjaui import UIContextNotification, UIContext
 import pypresence
 
 Settings().register_group("discordpresence", "Discord Presence")
